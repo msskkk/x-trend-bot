@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}投稿履歴 - X Trend Bot{% endblock %}
+{% block content %}
+
+<h1 class="text-2xl font-bold mb-6">投稿履歴</h1>
+
+{% if posts %}
+<div class="space-y-3">
+  {% for post in posts %}
+  <div class="bg-white rounded-lg shadow p-4">
+    <p class="whitespace-pre-wrap text-sm">{{ post.text }}</p>
+    <div class="flex gap-3 mt-2">
+      {% for genre in post.get('genres', []) %}
+        <span class="bg-blue-50 text-blue-600 px-2 py-0.5 rounded text-xs">{{ genre }}</span>
+      {% endfor %}
+      <span class="text-xs text-gray-400">{{ post.posted_at[:19] }}</span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="bg-white rounded-lg shadow p-6 text-center text-gray-400">
+  まだ投稿がありません
+</div>
+{% endif %}
+
+{% endblock %}

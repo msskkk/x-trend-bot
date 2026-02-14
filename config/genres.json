@@ -1,0 +1,22 @@
+{
+  "genres": [
+    {
+      "id": "stocks",
+      "name": "株式投資",
+      "description": "株式市場・個別銘柄に関する情報",
+      "enabled": true
+    },
+    {
+      "id": "crypto",
+      "name": "仮想通貨",
+      "description": "ビットコイン・アルトコインなど暗号資産",
+      "enabled": true
+    },
+    {
+      "id": "fx",
+      "name": "FX・為替",
+      "description": "為替相場・FXトレードに関する情報",
+      "enabled": true
+    }
+  ]
+}

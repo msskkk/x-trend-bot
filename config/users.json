@@ -1,0 +1,16 @@
+{
+  "users": [
+    {
+      "username": "nikkei",
+      "display_name": "日本経済新聞",
+      "genre": "stocks",
+      "enabled": true
+    },
+    {
+      "username": "BloombergJapan",
+      "display_name": "Bloomberg Japan",
+      "genre": "stocks",
+      "enabled": true
+    }
+  ]
+}

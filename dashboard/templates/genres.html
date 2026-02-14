@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}ジャンル管理 - X Trend Bot{% endblock %}
+{% block content %}
+
+<h1 class="text-2xl font-bold mb-6">ジャンル管理</h1>
+
+<!-- 追加フォーム -->
+<div class="bg-white rounded-lg shadow p-5 mb-6">
+  <h2 class="font-bold mb-3">ジャンルを追加</h2>
+  <form method="POST" action="/genres/add" class="flex flex-wrap gap-3 items-end">
+    <div>
+      <label class="block text-sm text-gray-600 mb-1">ID（英数字）</label>
+      <input type="text" name="genre_id" placeholder="例: realestate" required
+             class="border rounded px-3 py-2 text-sm w-36">
+    </div>
+    <div>
+      <label class="block text-sm text-gray-600 mb-1">名前</label>
+      <input type="text" name="name" placeholder="例: 不動産投資" required
+             class="border rounded px-3 py-2 text-sm w-40">
+    </div>
+    <div>
+      <label class="block text-sm text-gray-600 mb-1">説明</label>
+      <input type="text" name="description" placeholder="説明（任意）"
+             class="border rounded px-3 py-2 text-sm w-56">
+    </div>
+    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">
+      追加
+    </button>
+  </form>
+</div>
+
+<!-- ジャンル一覧 -->
+{% if genres %}
+<div class="bg-white rounded-lg shadow overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-50 text-left">
+      <tr>
+        <th class="px-4 py-3">ID</th>
+        <th class="px-4 py-3">名前</th>
+        <th class="px-4 py-3">説明</th>
+        <th class="px-4 py-3">状態</th>
+        <th class="px-4 py-3">操作</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y">
+      {% for genre in genres %}
+      <tr class="{% if not genre.enabled %}opacity-50{% endif %}">
+        <td class="px-4 py-3 font-mono text-xs">{{ genre.id }}</td>
+        <td class="px-4 py-3 font-medium">{{ genre.name }}</td>
+        <td class="px-4 py-3 text-gray-500">{{ genre.description }}</td>
+        <td class="px-4 py-3">
+          {% if genre.get('enabled', True) %}
+            <span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs">有効</span>
+          {% else %}
+            <span class="bg-gray-100 text-gray-500 px-2 py-0.5 rounded text-xs">無効</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3 flex gap-2">
+          <form method="POST" action="/genres/toggle/{{ genre.id }}">
+            <button class="text-blue-500 hover:underline text-xs">
+              {% if genre.get('enabled', True) %}無効にする{% else %}有効にする{% endif %}
+            </button>
+          </form>
+          <form method="POST" action="/genres/delete/{{ genre.id }}"
+                onsubmit="return confirm('削除しますか？')">
+            <button class="text-red-500 hover:underline text-xs">削除</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="bg-white rounded-lg shadow p-6 text-center text-gray-400">
+  ジャンルが登録されていません
+</div>
+{% endif %}
+
+{% endblock %}

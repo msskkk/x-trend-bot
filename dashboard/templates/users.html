@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}ユーザー管理 - X Trend Bot{% endblock %}
+{% block content %}
+
+<h1 class="text-2xl font-bold mb-6">監視ユーザー管理</h1>
+
+<!-- 追加フォーム -->
+<div class="bg-white rounded-lg shadow p-5 mb-6">
+  <h2 class="font-bold mb-3">ユーザーを追加</h2>
+  <form method="POST" action="/users/add" class="flex flex-wrap gap-3 items-end">
+    <div>
+      <label class="block text-sm text-gray-600 mb-1">ユーザー名</label>
+      <input type="text" name="username" placeholder="@username" required
+             class="border rounded px-3 py-2 text-sm w-44">
+    </div>
+    <div>
+      <label class="block text-sm text-gray-600 mb-1">表示名</label>
+      <input type="text" name="display_name" placeholder="表示名（任意）"
+             class="border rounded px-3 py-2 text-sm w-44">
+    </div>
+    <div>
+      <label class="block text-sm text-gray-600 mb-1">ジャンル</label>
+      <select name="genre" class="border rounded px-3 py-2 text-sm w-40">
+        {% for genre in genres %}
+          <option value="{{ genre.id }}">{{ genre.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">
+      追加
+    </button>
+  </form>
+</div>
+
+<!-- ユーザー一覧 -->
+{% if users %}
+<div class="bg-white rounded-lg shadow overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-50 text-left">
+      <tr>
+        <th class="px-4 py-3">ユーザー</th>
+        <th class="px-4 py-3">ジャンル</th>
+        <th class="px-4 py-3">状態</th>
+        <th class="px-4 py-3">操作</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y">
+      {% for user in users %}
+      <tr class="{% if not user.enabled %}opacity-50{% endif %}">
+        <td class="px-4 py-3">
+          <div class="font-medium">{{ user.display_name }}</div>
+          <div class="text-gray-400">@{{ user.username }}</div>
+        </td>
+        <td class="px-4 py-3">{{ user.genre }}</td>
+        <td class="px-4 py-3">
+          {% if user.get('enabled', True) %}
+            <span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs">有効</span>
+          {% else %}
+            <span class="bg-gray-100 text-gray-500 px-2 py-0.5 rounded text-xs">無効</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3 flex gap-2">
+          <form method="POST" action="/users/toggle/{{ user.username }}">
+            <button class="text-blue-500 hover:underline text-xs">
+              {% if user.get('enabled', True) %}無効にする{% else %}有効にする{% endif %}
+            </button>
+          </form>
+          <form method="POST" action="/users/delete/{{ user.username }}"
+                onsubmit="return confirm('削除しますか？')">
+            <button class="text-red-500 hover:underline text-xs">削除</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="bg-white rounded-lg shadow p-6 text-center text-gray-400">
+  ユーザーが登録されていません
+</div>
+{% endif %}
+
+{% endblock %}

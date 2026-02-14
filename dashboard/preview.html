@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>X Trend Bot - ダッシュボード</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .step-active { background: #1d4ed8; color: #fff; }
+    .step-done { background: #16a34a; color: #fff; }
+    .step-inactive { background: #e5e7eb; color: #6b7280; }
+    .x-post { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    .fade-in { animation: fadeIn 0.3s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .tweet-card { border: 2px solid transparent; cursor: pointer; transition: all 0.2s; }
+    .tweet-card:hover { border-color: #93c5fd; }
+    .tweet-card.selected { border-color: #2563eb; background: #eff6ff; }
+    .tab-active { border-bottom: 2px solid #fff; color: #fff; }
+    .tab-inactive { border-bottom: 2px solid transparent; color: #9ca3af; }
+    .status-draft { background: #fef3c7; color: #92400e; }
+    .status-approved { background: #dbeafe; color: #1e40af; }
+    .status-scheduled { background: #e0e7ff; color: #3730a3; }
+    .status-posted { background: #d1fae5; color: #065f46; }
+    .status-rejected { background: #fee2e2; color: #991b1b; }
+    .stock-card { transition: all 0.2s; }
+    .stock-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <!-- ヘッダー -->
+  <header class="bg-black text-white">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        <span class="font-bold text-lg">Trend Bot</span>
+      </div>
+      <!-- メインタブ -->
+      <div class="flex gap-6">
+        <button onclick="switchMainTab('generate')" id="main-tab-generate" class="tab-active pb-1 text-sm font-medium transition cursor-pointer">
+          生成フロー
+        </button>
+        <button onclick="switchMainTab('stock')" id="main-tab-stock" class="tab-inactive pb-1 text-sm font-medium transition cursor-pointer flex items-center gap-1.5">
+          ストック管理
+          <span class="bg-yellow-500 text-black text-[10px] font-bold px-1.5 py-0.5 rounded-full" id="stock-badge">5</span>
+        </button>
+      </div>
+      <div class="text-sm text-gray-400">管理ダッシュボード</div>
+    </div>
+  </header>
+
+  <!-- ============================================================ -->
+  <!-- メインタブ: 生成フロー                                         -->
+  <!-- ============================================================ -->
+  <main id="tab-generate" class="max-w-6xl mx-auto px-4 py-6">
+
+    <!-- ジャンル選択 -->
+    <div class="bg-white rounded-xl shadow-sm p-5 mb-6">
+      <div class="flex flex-wrap items-center gap-4">
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">ジャンル</label>
+          <select id="genre-select" onchange="switchGenre(this.value)" class="border border-gray-300 rounded-lg px-4 py-2.5 text-sm font-medium bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[180px]">
+            <option value="stocks">株式投資</option>
+            <option value="crypto">仮想通貨</option>
+            <option value="fx">FX・為替</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">期間</label>
+          <select class="border border-gray-300 rounded-lg px-4 py-2.5 text-sm font-medium bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <option>直近1時間</option>
+            <option>直近3時間</option>
+            <option>直近24時間</option>
+          </select>
+        </div>
+        <div class="ml-auto self-end">
+          <button onclick="runAnalysis()" class="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3l14 9-14 9V3z"/></svg>
+            分析を実行
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ステップインジケーター -->
+    <div class="flex items-center gap-2 mb-6">
+      <button onclick="goToStep(1)" id="step-btn-1" class="step-active px-4 py-2 rounded-full text-sm font-medium transition cursor-pointer">1. リサーチ</button>
+      <div class="w-8 h-0.5 bg-gray-300"></div>
+      <button onclick="goToStep(2)" id="step-btn-2" class="step-inactive px-4 py-2 rounded-full text-sm font-medium transition cursor-pointer">2. 分析結果</button>
+      <div class="w-8 h-0.5 bg-gray-300"></div>
+      <button onclick="goToStep(3)" id="step-btn-3" class="step-inactive px-4 py-2 rounded-full text-sm font-medium transition cursor-pointer">3. 投稿プレビュー</button>
+    </div>
+
+    <!-- STEP 1: リサーチ -->
+    <div id="step-1" class="fade-in">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold text-gray-800">リサーチ結果</h2>
+        <span id="research-genre-label" class="text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-medium">株式投資</span>
+      </div>
+      <div id="step1-sources">
+        <div class="bg-white rounded-xl shadow-sm mb-4 overflow-hidden">
+          <div class="px-5 py-3 bg-gray-50 border-b flex items-center gap-3">
+            <div class="w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center text-white text-xs font-bold">N</div>
+            <div><div class="font-bold text-sm">日本経済新聞</div><div class="text-xs text-gray-400">@nikkei</div></div>
+            <span class="ml-auto text-xs text-gray-400">5件取得</span>
+          </div>
+          <div class="divide-y">
+            <div class="px-5 py-3 hover:bg-gray-50 transition"><p class="text-sm text-gray-800">日経平均株価は前日比320円高の3万9280円で取引を終えた。半導体関連銘柄が買いを集め、全体を押し上げた。</p><div class="flex gap-4 mt-2 text-xs text-gray-400"><span>2025/02/11 14:30</span><span>♻ 245</span><span>♡ 1,203</span></div></div>
+            <div class="px-5 py-3 hover:bg-gray-50 transition"><p class="text-sm text-gray-800">トヨタ自動車、2025年3月期の連結純利益予想を上方修正。円安効果と北米販売好調が寄与。</p><div class="flex gap-4 mt-2 text-xs text-gray-400"><span>2025/02/11 13:15</span><span>♻ 189</span><span>♡ 876</span></div></div>
+            <div class="px-5 py-3 hover:bg-gray-50 transition"><p class="text-sm text-gray-800">日銀、次回会合で追加利上げ議論へ。市場は0.5%への引き上げを織り込み始める。</p><div class="flex gap-4 mt-2 text-xs text-gray-400"><span>2025/02/11 11:45</span><span>♻ 412</span><span>♡ 2,045</span></div></div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm mb-4 overflow-hidden">
+          <div class="px-5 py-3 bg-gray-50 border-b flex items-center gap-3">
+            <div class="w-8 h-8 bg-purple-700 rounded-full flex items-center justify-center text-white text-xs font-bold">B</div>
+            <div><div class="font-bold text-sm">Bloomberg Japan</div><div class="text-xs text-gray-400">@BloombergJapan</div></div>
+            <span class="ml-auto text-xs text-gray-400">5件取得</span>
+          </div>
+          <div class="divide-y">
+            <div class="px-5 py-3 hover:bg-gray-50 transition"><p class="text-sm text-gray-800">米FRB、利下げ見送りを示唆。パウエル議長「インフレは依然として高水準」と発言。</p><div class="flex gap-4 mt-2 text-xs text-gray-400"><span>2025/02/11 12:00</span><span>♻ 567</span><span>♡ 3,421</span></div></div>
+            <div class="px-5 py-3 hover:bg-gray-50 transition"><p class="text-sm text-gray-800">ソフトバンクG、AI投資ファンド第2弾を計画。規模は最大500億ドルか。</p><div class="flex gap-4 mt-2 text-xs text-gray-400"><span>2025/02/11 10:30</span><span>♻ 334</span><span>♡ 1,876</span></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-end mt-4">
+        <button onclick="goToStep(2)" class="bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2">
+          分析結果を見る <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- STEP 2: 分析結果 -->
+    <div id="step-2" class="hidden fade-in">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold text-gray-800">AI 分析結果</h2>
+        <span class="text-sm bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-medium flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+          Claude Sonnet 4.5
+        </span>
+      </div>
+      <!-- サマリー -->
+      <div class="bg-white rounded-xl shadow-sm p-6 mb-4">
+        <h3 class="font-bold text-gray-700 mb-3 flex items-center gap-2">
+          <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
+          トレンドサマリー
+        </h3>
+        <p class="text-sm text-gray-700 leading-relaxed" id="analysis-summary">本日の株式市場は<strong>半導体セクター主導の上昇</strong>が顕著。日経平均は320円高で引け、特にAI関連需要を背景とした半導体銘柄への資金流入が目立つ。一方、<strong>日銀の追加利上げ観測</strong>が浮上しており、金融セクターにも注目が集まっている。海外では<strong>米FRBの利下げ見送り示唆</strong>がドル高要因となり、円安がトヨタなど輸出企業の業績上方修正を後押し。</p>
+      </div>
+      <!-- キーポイント + 参照元 -->
+      <div class="bg-white rounded-xl shadow-sm p-6 mb-4">
+        <h3 class="font-bold text-gray-700 mb-3">キーポイント</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+          <div class="bg-green-50 border border-green-200 rounded-lg p-4"><div class="text-xs font-bold text-green-600 uppercase tracking-wide mb-1">ポジティブ</div><p class="text-sm text-gray-700" id="kp-positive">半導体関連が牽引し日経平均320円高。トヨタ業績上方修正。</p></div>
+          <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4"><div class="text-xs font-bold text-yellow-600 uppercase tracking-wide mb-1">注目</div><p class="text-sm text-gray-700" id="kp-watch">日銀追加利上げ議論。ソフトバンクG新AIファンド計画。</p></div>
+          <div class="bg-red-50 border border-red-200 rounded-lg p-4"><div class="text-xs font-bold text-red-500 uppercase tracking-wide mb-1">リスク</div><p class="text-sm text-gray-700" id="kp-risk">米FRB利下げ見送り示唆。インフレ長期化懸念。</p></div>
+        </div>
+        <h4 class="font-bold text-gray-600 text-sm mb-2 flex items-center gap-1.5">
+          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.54a4.5 4.5 0 00-1.242-7.244l4.5-4.5a4.5 4.5 0 016.364 6.364l-1.757 1.757"/></svg>
+          参照元ソース
+        </h4>
+        <div class="flex flex-wrap gap-2" id="references-list">
+          <span class="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2.5 py-1.5 rounded-full"><span class="font-medium text-gray-800">@nikkei</span> 日経平均320円高</span>
+          <span class="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2.5 py-1.5 rounded-full"><span class="font-medium text-gray-800">@nikkei</span> トヨタ業績上方修正</span>
+          <span class="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2.5 py-1.5 rounded-full"><span class="font-medium text-gray-800">@nikkei</span> 日銀追加利上げ議論</span>
+          <span class="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2.5 py-1.5 rounded-full"><span class="font-medium text-gray-800">@BloombergJapan</span> 米FRB利下げ見送り</span>
+          <span class="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2.5 py-1.5 rounded-full"><span class="font-medium text-gray-800">@BloombergJapan</span> SBG AIファンド</span>
+        </div>
+      </div>
+      <!-- 投稿分析 -->
+      <div class="bg-white rounded-xl shadow-sm p-6 mb-4">
+        <h3 class="font-bold text-gray-700 mb-3 flex items-center gap-2">
+          <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+          投稿分析
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="border border-gray-200 rounded-lg p-4"><div class="text-xs font-bold text-blue-600 uppercase tracking-wide mb-1">エンゲージメント予測</div><div class="flex items-center gap-2 mb-1"><div class="text-lg font-bold text-gray-900" id="pa-engagement-score">高</div><div class="flex-1 bg-gray-200 rounded-full h-2"><div class="bg-blue-500 h-2 rounded-full" style="width:80%" id="pa-engagement-bar"></div></div></div><p class="text-xs text-gray-500" id="pa-engagement-reason">半導体・日経平均は注目度が高く、RT・いいね率が見込める</p></div>
+          <div class="border border-gray-200 rounded-lg p-4"><div class="text-xs font-bold text-green-600 uppercase tracking-wide mb-1">トーン設計</div><p class="text-sm text-gray-700" id="pa-tone">市場を俯瞰しつつも、個人の感想を交えた親しみやすい語り口。「運用者本人が書いている」自然さを重視。</p></div>
+          <div class="border border-gray-200 rounded-lg p-4"><div class="text-xs font-bold text-purple-600 uppercase tracking-wide mb-1">オリジナリティ戦略</div><p class="text-sm text-gray-700" id="pa-originality">複数ソースの横断分析による独自視点を付加。単なるニュース転載ではなく「この人の意見が聞きたい」と思わせる構成。</p></div>
+          <div class="border border-gray-200 rounded-lg p-4"><div class="text-xs font-bold text-orange-600 uppercase tracking-wide mb-1">CTA導線設計</div><p class="text-sm text-gray-700" id="pa-cta">株式関連の話題は証券口座開設CTAとの親和性が高い。分析型ツイートにリンクを自然に組み込むのが効果的。</p></div>
+        </div>
+      </div>
+      <!-- 生成ツイート候補（3つ） -->
+      <div class="bg-white rounded-xl shadow-sm p-6 mb-4">
+        <h3 class="font-bold text-gray-700 mb-4 flex items-center gap-2">生成ツイート候補 <span class="text-xs font-normal text-gray-400">— クリックで選択</span></h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="tweet-candidates"></div>
+      </div>
+      <div class="flex justify-between mt-4">
+        <button onclick="goToStep(1)" class="text-gray-500 px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-200 transition flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> リサーチに戻る</button>
+        <div class="flex gap-3">
+          <button onclick="addAllToStock()" class="bg-yellow-500 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-yellow-600 transition flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
+            3件をストックに追加
+          </button>
+          <button onclick="goToStep(3)" class="bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2">
+            投稿プレビューへ <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3: 投稿プレビュー -->
+    <div id="step-3" class="hidden fade-in">
+      <h2 class="text-xl font-bold text-gray-800 mb-4">投稿プレビュー</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="preview-posts"></div>
+      <div class="mt-6 text-center">
+        <span class="inline-flex items-center gap-1.5 text-xs text-gray-400"><span class="w-2 h-2 bg-yellow-400 rounded-full"></span> DRY_RUN モード — 実際には投稿されません</span>
+      </div>
+      <div class="flex justify-start mt-8">
+        <button onclick="goToStep(2)" class="text-gray-500 px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-200 transition flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> 分析に戻る</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============================================================ -->
+  <!-- メインタブ: ストック管理                                       -->
+  <!-- ============================================================ -->
+  <main id="tab-stock" class="max-w-6xl mx-auto px-4 py-6 hidden">
+
+    <!-- サマリーカード -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+      <div class="bg-white rounded-xl shadow-sm p-4 text-center">
+        <div class="text-2xl font-bold text-gray-900" id="count-all">8</div>
+        <div class="text-xs text-gray-500 mt-1">全ストック</div>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm p-4 text-center">
+        <div class="text-2xl font-bold text-yellow-600" id="count-draft">3</div>
+        <div class="text-xs text-gray-500 mt-1">下書き</div>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm p-4 text-center">
+        <div class="text-2xl font-bold text-indigo-600" id="count-scheduled">2</div>
+        <div class="text-xs text-gray-500 mt-1">予約済み</div>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm p-4 text-center">
+        <div class="text-2xl font-bold text-green-600" id="count-posted">2</div>
+        <div class="text-xs text-gray-500 mt-1">投稿済み</div>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm p-4 text-center">
+        <div class="text-2xl font-bold text-red-600" id="count-rejected">1</div>
+        <div class="text-xs text-gray-500 mt-1">差し戻し</div>
+      </div>
+    </div>
+
+    <!-- フィルター -->
+    <div class="flex flex-wrap items-center gap-2 mb-4">
+      <button onclick="filterStock('all')" class="stock-filter px-4 py-2 rounded-full text-sm font-medium bg-gray-900 text-white transition" data-filter="all">すべて</button>
+      <button onclick="filterStock('draft')" class="stock-filter px-4 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition" data-filter="draft">下書き</button>
+      <button onclick="filterStock('scheduled')" class="stock-filter px-4 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition" data-filter="scheduled">予約済み</button>
+      <button onclick="filterStock('posted')" class="stock-filter px-4 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition" data-filter="posted">投稿済み</button>
+      <button onclick="filterStock('rejected')" class="stock-filter px-4 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition" data-filter="rejected">差し戻し</button>
+      <div class="ml-auto">
+        <span class="text-xs text-gray-400">自動生成: 毎時0分に実行</span>
+        <span class="ml-2 inline-flex items-center gap-1 text-xs text-green-600"><span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>稼働中</span>
+      </div>
+    </div>
+
+    <!-- ストック一覧 -->
+    <div id="stock-list" class="space-y-3">
+      <!-- JSで描画 -->
+    </div>
+  </main>
+
+  <!-- フッター -->
+  <footer class="max-w-6xl mx-auto px-4 py-8 mt-8">
+    <div class="text-center text-xs text-gray-400">X Trend Bot — Powered by Claude AI</div>
+  </footer>
+
+  <script>
+    let currentStep = 1;
+    let selectedTweetIdx = 0;
+    let currentFilter = 'all';
+
+    // ================================================================
+    // ストックデータ（モック）
+    // ================================================================
+    const stockItems = [
+      {
+        id: 1, status: 'draft', genre: '株式投資', type: 'ニュース速報型', typeColor: 'blue',
+        text: '今日の日経平均、+320円で引けましたね。半導体がやっぱり強い。トヨタの上方修正も好材料だけど、日銀の利上げ観測がどう影響するか…来週の動き、要チェックです。\n\n#株式投資 #日経平均',
+        createdAt: '2025/02/11 15:00', scheduledAt: null, postedAt: null,
+        source: '@nikkei, @BloombergJapan'
+      },
+      {
+        id: 2, status: 'draft', genre: '株式投資', type: '分析・考察型', typeColor: 'purple',
+        text: '半導体×円安×トヨタ上方修正、この3つが重なった今日の+320円。でも本質はFRBの利下げ見送り→ドル高→円安の流れ。日銀が利上げに動けば逆回転もあり得る。今のうちにポートフォリオ見直しておくのが吉かも。\n\n▼ まだ証券口座持ってない方はこちら\nhttps://example.com/open-account\n\n#株式投資 #投資初心者',
+        createdAt: '2025/02/11 15:00', scheduledAt: null, postedAt: null,
+        source: '@nikkei, @BloombergJapan'
+      },
+      {
+        id: 3, status: 'draft', genre: '仮想通貨', type: 'カジュアル対話型', typeColor: 'green',
+        text: 'BTC 10万ドルおめ！🎉 去年の今頃は半信半疑だった人も多いんじゃない？笑 ETHもSOLも控えてるイベントあるし、ここから何に張るかが大事よね。みんなのポートフォリオ聞きたいw\n\n#ビットコイン #crypto',
+        createdAt: '2025/02/11 14:00', scheduledAt: null, postedAt: null,
+        source: '@CoinPost_JP'
+      },
+      {
+        id: 4, status: 'scheduled', genre: '仮想通貨', type: '分析・考察型', typeColor: 'purple',
+        text: 'BTC 10万ドルの意味を冷静に考えてみた。ETF承認後の機関投資家参入が本格化して「デジタルゴールド」の位置づけが固まりつつある。ETH Pectraも3月控えてるし、SOL ETFも審査開始。このサイクル、まだ序盤かもしれない。\n\n▼ 暗号資産を始めるならこちら\nhttps://example.com/crypto-account\n\n#仮想通貨 #投資',
+        createdAt: '2025/02/11 14:00', scheduledAt: '2025/02/11 18:00', postedAt: null,
+        source: '@CoinPost_JP'
+      },
+      {
+        id: 5, status: 'scheduled', genre: 'FX・為替', type: 'ニュース速報型', typeColor: 'blue',
+        text: 'ドル円154円台半ば。米金利高がドルを支えてる構図は変わらず。ECBが利下げ示唆でユーロ安、豪ドルは中国の景気刺激策で急伸。通貨間の強弱がはっきりしてきた印象です。\n\n#FX #ドル円',
+        createdAt: '2025/02/11 13:00', scheduledAt: '2025/02/11 19:30', postedAt: null,
+        source: '@ReutersJapan'
+      },
+      {
+        id: 6, status: 'posted', genre: '株式投資', type: 'カジュアル対話型', typeColor: 'green',
+        text: '前場終了〜。半導体がめちゃくちゃ強くて日経+250円。後場どうなるか…個人的にはトヨタの決算も気になってる。今日の引け値予想、みんなどう見てる？\n\n#株式投資 #日経平均',
+        createdAt: '2025/02/11 09:00', scheduledAt: '2025/02/11 12:00', postedAt: '2025/02/11 12:00',
+        source: '@nikkei', engagement: { rt: 45, like: 312, view: '12.4K' }
+      },
+      {
+        id: 7, status: 'posted', genre: '仮想通貨', type: 'ニュース速報型', typeColor: 'blue',
+        text: 'BTC 9.8万ドル台に到達。10万ドルの大台が目前に。ETF資金流入は先週比+20%で加速中。ここを抜けるかどうかが今週最大の注目ポイント。\n\n#ビットコイン #仮想通貨',
+        createdAt: '2025/02/10 18:00', scheduledAt: '2025/02/10 21:00', postedAt: '2025/02/10 21:00',
+        source: '@CoinPost_JP', engagement: { rt: 89, like: 567, view: '28.1K' }
+      },
+      {
+        id: 8, status: 'rejected', genre: 'FX・為替', type: '分析・考察型', typeColor: 'purple',
+        text: 'ドル円155円突破！これは完全に円安トレンド確定。全力でドル買いでOK🔥🔥🔥\n\n#FX #ドル円',
+        createdAt: '2025/02/10 15:00', scheduledAt: null, postedAt: null,
+        source: '@ReutersJapan', rejectReason: '煽り表現が強すぎる。投資助言に該当する可能性あり。'
+      }
+    ];
+
+    // ================================================================
+    // サンプルデータ（ジャンル別）
+    // ================================================================
+    const sampleData = {
+      stocks: {
+        label: '株式投資',
+        sources: [
+          { name: '日本経済新聞', handle: '@nikkei', avatar: 'N', color: 'bg-gray-800', count: 5, posts: [
+            { text: '日経平均株価は前日比320円高の3万9280円で取引を終えた。半導体関連銘柄が買いを集め、全体を押し上げた。', time: '2025/02/11 14:30', rt: 245, like: '1,203' },
+            { text: 'トヨタ自動車、2025年3月期の連結純利益予想を上方修正。円安効果と北米販売好調が寄与。', time: '2025/02/11 13:15', rt: 189, like: '876' },
+            { text: '日銀、次回会合で追加利上げ議論へ。市場は0.5%への引き上げを織り込み始める。', time: '2025/02/11 11:45', rt: 412, like: '2,045' }
+          ]},
+          { name: 'Bloomberg Japan', handle: '@BloombergJapan', avatar: 'B', color: 'bg-purple-700', count: 5, posts: [
+            { text: '米FRB、利下げ見送りを示唆。パウエル議長「インフレは依然として高水準」と発言。', time: '2025/02/11 12:00', rt: 567, like: '3,421' },
+            { text: 'ソフトバンクG、AI投資ファンド第2弾を計画。規模は最大500億ドルか。', time: '2025/02/11 10:30', rt: 334, like: '1,876' }
+          ]}
+        ],
+        references: [
+          { source: '@nikkei', topic: '日経平均320円高' }, { source: '@nikkei', topic: 'トヨタ業績上方修正' },
+          { source: '@nikkei', topic: '日銀追加利上げ議論' }, { source: '@BloombergJapan', topic: '米FRB利下げ見送り' },
+          { source: '@BloombergJapan', topic: 'SBG AIファンド' }
+        ],
+        analysis: { summary: '本日の株式市場は<strong>半導体セクター主導の上昇</strong>が顕著。日経平均は320円高で引け、特にAI関連需要を背景とした半導体銘柄への資金流入が目立つ。一方、<strong>日銀の追加利上げ観測</strong>が浮上しており、金融セクターにも注目が集まっている。海外では<strong>米FRBの利下げ見送り示唆</strong>がドル高要因となり、円安がトヨタなど輸出企業の業績上方修正を後押し。', positive: '半導体関連が牽引し日経平均320円高。トヨタ業績上方修正。', watch: '日銀追加利上げ議論。ソフトバンクG新AIファンド計画。', risk: '米FRB利下げ見送り示唆。インフレ長期化懸念。' },
+        postAnalysis: { engagementScore: '高', engagementBar: '80%', engagementReason: '半導体・日経平均は注目度が高く、RT・いいね率が見込める', tone: '市場を俯瞰しつつも、個人の感想を交えた親しみやすい語り口。「運用者本人が書いている」自然さを重視。', originality: '複数ソースの横断分析による独自視点を付加。単なるニュース転載ではなく「この人の意見が聞きたい」と思わせる構成。', cta: '株式関連の話題は証券口座開設CTAとの親和性が高い。分析型ツイートにリンクを自然に組み込むのが効果的。' },
+        tweets: [
+          { label: 'ニュース速報型', labelColor: 'blue', text: '今日の日経平均、+320円で引けましたね。半導体がやっぱり強い。トヨタの上方修正も好材料だけど、日銀の利上げ観測がどう影響するか…来週の動き、要チェックです。\n\n#株式投資 #日経平均', html: '今日の日経平均、+320円で引けましたね。半導体がやっぱり強い。トヨタの上方修正も好材料だけど、日銀の利上げ観測がどう影響するか…来週の動き、要チェックです。<br><br><span class="text-blue-500">#株式投資</span> <span class="text-blue-500">#日経平均</span>', note: '速報性重視。事実ベースに自分の所感を添えて信頼感を醸成。' },
+          { label: '分析・考察型', labelColor: 'purple', text: '半導体×円安×トヨタ上方修正、この3つが重なった今日の+320円。でも本質はFRBの利下げ見送り→ドル高→円安の流れ。日銀が利上げに動けば逆回転もあり得る。今のうちにポートフォリオ見直しておくのが吉かも。\n\n▼ まだ証券口座持ってない方はこちら\nhttps://example.com/open-account\n\n#株式投資 #投資初心者', html: '半導体×円安×トヨタ上方修正、この3つが重なった今日の+320円。でも本質はFRBの利下げ見送り→ドル高→円安の流れ。日銀が利上げに動けば逆回転もあり得る。今のうちにポートフォリオ見直しておくのが吉かも。<br><br>▼ まだ証券口座持ってない方はこちら<br><span class="text-blue-500">https://example.com/open-account</span><br><br><span class="text-blue-500">#株式投資</span> <span class="text-blue-500">#投資初心者</span>', note: '独自の分析でオリジナリティを確保。証券口座CTAリンクを自然に配置。' },
+          { label: 'カジュアル対話型', labelColor: 'green', text: '日経+320円、半導体が引っ張ってくれた〜！トヨタも好調だし、保有してる人おめ🎉 ただ日銀の利上げ話がちょっと気になるんだよな…。みんなはどう見てる？\n\n#株式投資 #日経平均', html: '日経+320円、半導体が引っ張ってくれた〜！トヨタも好調だし、保有してる人おめ🎉 ただ日銀の利上げ話がちょっと気になるんだよな…。みんなはどう見てる？<br><br><span class="text-blue-500">#株式投資</span> <span class="text-blue-500">#日経平均</span>', note: '親しみやすさ重視。問いかけでリプライ・エンゲージメントを狙う。' }
+        ]
+      },
+      crypto: {
+        label: '仮想通貨',
+        sources: [
+          { name: 'CoinPost', handle: '@CoinPost_JP', avatar: 'C', color: 'bg-orange-600', count: 5, posts: [
+            { text: 'ビットコインが10万ドルを突破。機関投資家の買いが継続し、ETF経由の資金流入が加速。', time: '2025/02/11 15:00', rt: 890, like: '5,432' },
+            { text: 'イーサリアム、次期大型アップグレード「Pectra」のテストネット展開を完了。本番適用は3月予定。', time: '2025/02/11 13:00', rt: 423, like: '2,100' },
+            { text: 'SEC、新たな暗号資産ETFの審査を開始。ソラナETFの承認可否に注目集まる。', time: '2025/02/11 11:00', rt: 678, like: '3,876' }
+          ]}
+        ],
+        references: [ { source: '@CoinPost_JP', topic: 'BTC 10万ドル突破' }, { source: '@CoinPost_JP', topic: 'ETH Pectraアップグレード' }, { source: '@CoinPost_JP', topic: 'SEC ソラナETF審査開始' } ],
+        analysis: { summary: 'ビットコインが<strong>10万ドルの大台を突破</strong>し、暗号資産市場全体が活況。ETF経由の機関投資家資金が引き続き流入している。イーサリアムは<strong>Pectraアップグレード</strong>が順調に進行。規制面では<strong>SECのソラナETF審査開始</strong>が注目材料。', positive: 'BTC 10万ドル突破。機関投資家の資金流入が加速。', watch: 'ETH Pectraアップグレード3月予定。ソラナETF審査開始。', risk: '急騰後の利確売り圧力。規制強化リスク。' },
+        postAnalysis: { engagementScore: '非常に高', engagementBar: '95%', engagementReason: 'BTC 10万ドルは歴史的節目であり、拡散力・注目度ともに極めて高い', tone: '暗号資産界隈のカルチャーに合わせた表現。専門用語は使いつつもライトな語り口で間口を広く。', originality: 'ETF・Pectra・SOL ETFを横断的に俯瞰し、市場全体のストーリーとして語る構成がオリジナリティ。', cta: '暗号資産の盛り上がりをきっかけに口座開設を促すのは自然な流れ。初心者向け解説を添えると効果的。' },
+        tweets: [
+          { label: 'ニュース速報型', labelColor: 'blue', text: 'BTC、ついに10万ドル突破。ETF経由の機関マネー流入が止まらない展開。ETHもPectraアップグレード控えてるし、SOL ETF審査もスタート。暗号資産市場、しばらく目が離せないですね。\n\n#ビットコイン #仮想通貨', html: 'BTC、ついに10万ドル突破。ETF経由の機関マネー流入が止まらない展開。ETHもPectraアップグレード控えてるし、SOL ETF審査もスタート。暗号資産市場、しばらく目が離せないですね。<br><br><span class="text-blue-500">#ビットコイン</span> <span class="text-blue-500">#仮想通貨</span>', note: '速報性重視。事実の列挙+軽い所感で情報提供者としての信頼感。' },
+          { label: '分析・考察型', labelColor: 'purple', text: 'BTC 10万ドルの意味を冷静に考えてみた。ETF承認後の機関投資家参入が本格化して「デジタルゴールド」の位置づけが固まりつつある。ETH Pectraも3月控えてるし、SOL ETFも審査開始。このサイクル、まだ序盤かもしれない。\n\n▼ 暗号資産を始めるならこちら\nhttps://example.com/crypto-account\n\n#仮想通貨 #投資', html: 'BTC 10万ドルの意味を冷静に考えてみた。ETF承認後の機関投資家参入が本格化して「デジタルゴールド」の位置づけが固まりつつある。ETH Pectraも3月控えてるし、SOL ETFも審査開始。このサイクル、まだ序盤かもしれない。<br><br>▼ 暗号資産を始めるならこちら<br><span class="text-blue-500">https://example.com/crypto-account</span><br><br><span class="text-blue-500">#仮想通貨</span> <span class="text-blue-500">#投資</span>', note: '独自考察でオリジナリティ確保。口座開設CTAを自然に配置。' },
+          { label: 'カジュアル対話型', labelColor: 'green', text: 'BTC 10万ドルおめ！🎉 去年の今頃は半信半疑だった人も多いんじゃない？笑 ETHもSOLも控えてるイベントあるし、ここから何に張るかが大事よね。みんなのポートフォリオ聞きたいw\n\n#ビットコイン #crypto', html: 'BTC 10万ドルおめ！🎉 去年の今頃は半信半疑だった人も多いんじゃない？笑 ETHもSOLも控えてるイベントあるし、ここから何に張るかが大事よね。みんなのポートフォリオ聞きたいw<br><br><span class="text-blue-500">#ビットコイン</span> <span class="text-blue-500">#crypto</span>', note: '親しみやすさ全開。問いかけでリプライ・引用RTを誘発。' }
+        ]
+      },
+      fx: {
+        label: 'FX・為替',
+        sources: [
+          { name: 'ロイター', handle: '@ReutersJapan', avatar: 'R', color: 'bg-blue-800', count: 5, posts: [
+            { text: 'ドル円、154円台半ばで推移。米長期金利上昇がドルを下支え。', time: '2025/02/11 14:00', rt: 312, like: '1,543' },
+            { text: '欧州中央銀行（ECB）、3月の追加利下げを示唆。ユーロ安が進行。', time: '2025/02/11 12:30', rt: 234, like: '987' },
+            { text: '豪ドル、中国の景気刺激策発表を受けて急伸。対円で100円台を回復。', time: '2025/02/11 10:00', rt: 156, like: '654' }
+          ]}
+        ],
+        references: [ { source: '@ReutersJapan', topic: 'ドル円154円台推移' }, { source: '@ReutersJapan', topic: 'ECB追加利下げ示唆' }, { source: '@ReutersJapan', topic: '豪ドル急伸100円台' } ],
+        analysis: { summary: '為替市場は<strong>ドル高基調が継続</strong>。米長期金利の上昇を背景にドル円は154円台で推移。欧州では<strong>ECBの追加利下げ示唆</strong>でユーロが売られる展開。一方、<strong>中国の景気刺激策</strong>を受けて豪ドルが対円で急伸し100円台を回復。', positive: '豪ドル急伸、対円100円台回復。中国景気刺激策が追い風。', watch: 'ドル円154円台。日銀利上げ観測 vs 米金利高のせめぎ合い。', risk: 'ECB追加利下げでユーロ安進行。新興国通貨にも波及か。' },
+        postAnalysis: { engagementScore: '中〜高', engagementBar: '65%', engagementReason: 'ドル円は常に注目度が高いが、FXは株式・暗号資産より母数が限定的', tone: '為替特有のテクニカルな話題を、初心者にも伝わるよう噛み砕いた表現で。', originality: 'ドル円だけでなくユーロ・豪ドルまで俯瞰し、通貨間の相関関係を独自視点で解説。', cta: 'FXは口座開設から取引開始までのハードルが低く、CTAの転換率が高い傾向。' },
+        tweets: [
+          { label: 'ニュース速報型', labelColor: 'blue', text: 'ドル円154円台半ば。米金利高がドルを支えてる構図は変わらず。ECBが利下げ示唆でユーロ安、豪ドルは中国の景気刺激策で急伸。通貨間の強弱がはっきりしてきた印象です。\n\n#FX #ドル円', html: 'ドル円154円台半ば。米金利高がドルを支えてる構図は変わらず。ECBが利下げ示唆でユーロ安、豪ドルは中国の景気刺激策で急伸。通貨間の強弱がはっきりしてきた印象です。<br><br><span class="text-blue-500">#FX</span> <span class="text-blue-500">#ドル円</span>', note: '速報性重視。複数通貨ペアの動きを簡潔にまとめて情報価値を提供。' },
+          { label: '分析・考察型', labelColor: 'purple', text: 'ドル円154円台、表面上は安定してるけど水面下では日銀利上げ vs 米金利高のせめぎ合い。ユーロはECB利下げで下落基調、豪ドルは中国材料で急伸。通貨ペアの選び方で結果が大きく変わる局面。\n\n▼ FXを始めるならこちら\nhttps://example.com/fx-account\n\n#FX #為替 #投資', html: 'ドル円154円台、表面上は安定してるけど水面下では日銀利上げ vs 米金利高のせめぎ合い。ユーロはECB利下げで下落基調、豪ドルは中国材料で急伸。通貨ペアの選び方で結果が大きく変わる局面。<br><br>▼ FXを始めるならこちら<br><span class="text-blue-500">https://example.com/fx-account</span><br><br><span class="text-blue-500">#FX</span> <span class="text-blue-500">#為替</span> <span class="text-blue-500">#投資</span>', note: '独自分析+口座開設CTA。通貨間の相関を語ることでオリジナリティを確保。' },
+          { label: 'カジュアル対話型', labelColor: 'green', text: 'ドル円154円台、動きそうで動かない微妙な位置😂 個人的には豪ドル円のほうが面白いかなって思ってる。中国の景気刺激策で100円台回復してるし。みんなは今どの通貨ペア見てる？\n\n#FX #ドル円', html: 'ドル円154円台、動きそうで動かない微妙な位置😂 個人的には豪ドル円のほうが面白いかなって思ってる。中国の景気刺激策で100円台回復してるし。みんなは今どの通貨ペア見てる？<br><br><span class="text-blue-500">#FX</span> <span class="text-blue-500">#ドル円</span>', note: 'カジュアルな語り口で共感を誘う。質問形式でエンゲージメント向上。' }
+        ]
+      }
+    };
+
+    // ================================================================
+    // メインタブ切替
+    // ================================================================
+    function switchMainTab(tab) {
+      document.getElementById('tab-generate').classList.toggle('hidden', tab !== 'generate');
+      document.getElementById('tab-stock').classList.toggle('hidden', tab !== 'stock');
+      document.getElementById('main-tab-generate').className = tab === 'generate' ? 'tab-active pb-1 text-sm font-medium transition cursor-pointer' : 'tab-inactive pb-1 text-sm font-medium transition cursor-pointer';
+      document.getElementById('main-tab-stock').className = (tab === 'stock' ? 'tab-active' : 'tab-inactive') + ' pb-1 text-sm font-medium transition cursor-pointer flex items-center gap-1.5';
+      if (tab === 'stock') renderStockList();
+    }
+
+    // ================================================================
+    // ストック管理
+    // ================================================================
+    function renderStockList() {
+      const container = document.getElementById('stock-list');
+      const items = currentFilter === 'all' ? stockItems : stockItems.filter(s => s.status === currentFilter);
+
+      container.innerHTML = items.map(item => {
+        const statusMap = {
+          draft:     { label: '下書き',   class: 'status-draft' },
+          approved:  { label: '承認済み', class: 'status-approved' },
+          scheduled: { label: '予約済み', class: 'status-scheduled' },
+          posted:    { label: '投稿済み', class: 'status-posted' },
+          rejected:  { label: '差し戻し', class: 'status-rejected' }
+        };
+        const typeColors = { blue: 'bg-blue-100 text-blue-700', purple: 'bg-purple-100 text-purple-700', green: 'bg-green-100 text-green-700' };
+        const st = statusMap[item.status];
+        const tc = typeColors[item.typeColor] || typeColors.blue;
+
+        let actionsHtml = '';
+        if (item.status === 'draft') {
+          actionsHtml = `
+            <div class="flex flex-wrap gap-2 mt-3 pt-3 border-t">
+              <div class="flex items-center gap-2">
+                <label class="text-xs text-gray-500">予約日時:</label>
+                <input type="datetime-local" class="border border-gray-300 rounded px-2 py-1 text-xs" value="2025-02-11T18:00">
+              </div>
+              <button onclick="scheduleItem(${item.id})" class="bg-indigo-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-indigo-700 transition flex items-center gap-1">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                予約投稿
+              </button>
+              <button onclick="rejectItem(${item.id})" class="text-red-500 px-3 py-1.5 rounded text-xs font-medium hover:bg-red-50 transition">差し戻す</button>
+            </div>`;
+        } else if (item.status === 'scheduled') {
+          actionsHtml = `
+            <div class="flex items-center gap-3 mt-3 pt-3 border-t">
+              <div class="flex items-center gap-1.5 text-xs text-indigo-600">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                ${item.scheduledAt} に投稿予定
+              </div>
+              <button onclick="cancelSchedule(${item.id})" class="text-gray-500 px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-100 transition">予約取消</button>
+            </div>`;
+        } else if (item.status === 'posted' && item.engagement) {
+          actionsHtml = `
+            <div class="flex items-center gap-4 mt-3 pt-3 border-t text-xs text-gray-500">
+              <span>投稿: ${item.postedAt}</span>
+              <span>♻ ${item.engagement.rt}</span>
+              <span>♡ ${item.engagement.like}</span>
+              <span>👁 ${item.engagement.view}</span>
+            </div>`;
+        } else if (item.status === 'rejected') {
+          actionsHtml = `
+            <div class="mt-3 pt-3 border-t">
+              <div class="flex items-center gap-1.5 text-xs text-red-500 mb-2">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"/></svg>
+                理由: ${item.rejectReason}
+              </div>
+              <button class="text-blue-600 px-3 py-1.5 rounded text-xs font-medium hover:bg-blue-50 transition">編集して再提出</button>
+            </div>`;
+        }
+
+        return `
+          <div class="bg-white rounded-xl shadow-sm overflow-hidden stock-card">
+            <div class="p-5">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-xs font-bold px-2 py-0.5 rounded-full ${st.class}">${st.label}</span>
+                <span class="text-xs font-bold px-2 py-0.5 rounded-full ${tc}">${item.type}</span>
+                <span class="text-xs text-gray-400 ml-1">${item.genre}</span>
+                <span class="text-xs text-gray-300 ml-auto">${item.source}</span>
+              </div>
+              <p class="text-sm text-gray-800 leading-relaxed whitespace-pre-line">${item.text}</p>
+              <div class="text-xs text-gray-400 mt-2">生成: ${item.createdAt}</div>
+              ${actionsHtml}
+            </div>
+          </div>`;
+      }).join('');
+
+      // カウント更新
+      document.getElementById('count-all').textContent = stockItems.length;
+      document.getElementById('count-draft').textContent = stockItems.filter(s => s.status === 'draft').length;
+      document.getElementById('count-scheduled').textContent = stockItems.filter(s => s.status === 'scheduled').length;
+      document.getElementById('count-posted').textContent = stockItems.filter(s => s.status === 'posted').length;
+      document.getElementById('count-rejected').textContent = stockItems.filter(s => s.status === 'rejected').length;
+      document.getElementById('stock-badge').textContent = stockItems.filter(s => s.status === 'draft').length;
+    }
+
+    function filterStock(filter) {
+      currentFilter = filter;
+      document.querySelectorAll('.stock-filter').forEach(btn => {
+        btn.className = btn.dataset.filter === filter
+          ? 'stock-filter px-4 py-2 rounded-full text-sm font-medium bg-gray-900 text-white transition'
+          : 'stock-filter px-4 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition';
+      });
+      renderStockList();
+    }
+
+    function scheduleItem(id) {
+      const item = stockItems.find(s => s.id === id);
+      if (item) { item.status = 'scheduled'; item.scheduledAt = '2025/02/11 18:00'; }
+      renderStockList();
+    }
+
+    function cancelSchedule(id) {
+      const item = stockItems.find(s => s.id === id);
+      if (item) { item.status = 'draft'; item.scheduledAt = null; }
+      renderStockList();
+    }
+
+    function rejectItem(id) {
+      const item = stockItems.find(s => s.id === id);
+      if (item) { item.status = 'rejected'; item.rejectReason = '手動で差し戻し'; }
+      renderStockList();
+    }
+
+    function addAllToStock() {
+      alert('3件のツイート候補をストックに追加しました！\n（デモ）ストック管理タブで確認できます。');
+    }
+
+    // ================================================================
+    // 生成フロー（既存）
+    // ================================================================
+    function renderTweetCandidates(genre) {
+      const data = sampleData[genre];
+      const container = document.getElementById('tweet-candidates');
+      container.innerHTML = data.tweets.map((t, i) => {
+        const colors = { blue: 'bg-blue-100 text-blue-700', purple: 'bg-purple-100 text-purple-700', green: 'bg-green-100 text-green-700' };
+        return `
+          <div class="tweet-card rounded-lg border border-gray-200 p-4 ${i === selectedTweetIdx ? 'selected' : ''}" onclick="selectTweet(${i})">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold px-2 py-0.5 rounded-full ${colors[t.labelColor]}">${t.label}</span>
+              <span class="text-xs text-gray-400">${t.text.length} / 280文字</span>
+            </div>
+            <p class="text-sm text-gray-800 leading-relaxed whitespace-pre-line mb-3">${t.text}</p>
+            <p class="text-xs text-gray-400 italic border-t pt-2">${t.note}</p>
+          </div>`;
+      }).join('');
+    }
+
+    function renderPreviewPosts(genre) {
+      const data = sampleData[genre];
+      const container = document.getElementById('preview-posts');
+      container.innerHTML = data.tweets.map((t, i) => {
+        const colors = { blue: 'bg-blue-100 text-blue-700', purple: 'bg-purple-100 text-purple-700', green: 'bg-green-100 text-green-700' };
+        return `
+          <div>
+            <div class="mb-2 text-center"><span class="text-xs font-bold px-2.5 py-1 rounded-full ${colors[t.labelColor]}">候補${i+1}: ${t.label}</span></div>
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden x-post">
+              <div class="px-4 pt-4 flex items-start gap-3">
+                <div class="w-10 h-10 bg-black rounded-full flex items-center justify-center flex-shrink-0"><svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></div>
+                <div class="flex-1 min-w-0"><div class="flex items-center gap-1"><span class="font-bold text-[15px] text-gray-900">X Trend Bot</span><svg class="w-4 h-4 text-blue-500" viewBox="0 0 24 24" fill="currentColor"><path d="M22.25 12c0-1.43-.88-2.67-2.19-3.34.46-1.39.2-2.9-.81-3.91s-2.52-1.27-3.91-.81c-.66-1.31-1.91-2.19-3.34-2.19s-2.67.88-3.34 2.19c-1.39-.46-2.9-.2-3.91.81s-1.27 2.52-.81 3.91C2.63 9.33 1.75 10.57 1.75 12s.88 2.67 2.19 3.34c-.46 1.39-.2 2.9.81 3.91s2.52 1.27 3.91.81c.66 1.31 1.91 2.19 3.34 2.19s2.67-.88 3.34-2.19c1.39.46 2.9.2 3.91-.81s1.27-2.52.81-3.91c1.31-.67 2.19-1.91 2.19-3.34zm-11.06 4.29l-3.18-3.18 1.06-1.06 2.12 2.12 5.3-5.3 1.06 1.06-6.36 6.36z"/></svg></div><div class="text-[13px] text-gray-500">@x_trend_bot</div></div>
+                <svg class="w-5 h-5 text-gray-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="6" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="18" r="1.5"/></svg>
+              </div>
+              <div class="px-4 py-3"><p class="text-[15px] leading-relaxed text-gray-900">${t.html}</p></div>
+              <div class="px-4 pb-3"><div class="text-[13px] text-gray-500">午後3:00 · 2025年2月11日</div></div>
+              <div class="border-t border-gray-200"></div>
+              <div class="px-4 py-2.5 flex gap-4 text-[13px] text-gray-500 border-b border-gray-200"><span><strong class="text-gray-900">—</strong> リポスト</span><span><strong class="text-gray-900">—</strong> いいね</span><span><strong class="text-gray-900">—</strong> 表示</span></div>
+              <div class="px-4 py-2 flex justify-around">
+                <button class="text-gray-500 hover:text-blue-500 p-2 rounded-full hover:bg-blue-50 transition"><svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 01-.923 1.785A5.969 5.969 0 006 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337z"/></svg></button>
+                <button class="text-gray-500 hover:text-green-500 p-2 rounded-full hover:bg-green-50 transition"><svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.678 48.678 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3l-3 3"/></svg></button>
+                <button class="text-gray-500 hover:text-pink-500 p-2 rounded-full hover:bg-pink-50 transition"><svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"/></svg></button>
+                <button class="text-gray-500 hover:text-blue-500 p-2 rounded-full hover:bg-blue-50 transition"><svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg></button>
+              </div>
+            </div>
+            <div class="mt-3 text-center">
+              <button onclick="addAllToStock()" class="bg-black text-white px-5 py-2 rounded-full text-xs font-bold hover:bg-gray-800 transition inline-flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                ストックに追加
+              </button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function selectTweet(idx) { selectedTweetIdx = idx; renderTweetCandidates(document.getElementById('genre-select').value); }
+
+    function goToStep(step) {
+      document.querySelectorAll('[id^="step-"]:not([id^="step-btn"])').forEach(el => el.classList.add('hidden'));
+      document.getElementById('step-' + step).classList.remove('hidden');
+      currentStep = step;
+      updateStepButtons();
+      if (step === 3) renderPreviewPosts(document.getElementById('genre-select').value);
+    }
+
+    function updateStepButtons() {
+      for (let i = 1; i <= 3; i++) {
+        const btn = document.getElementById('step-btn-' + i);
+        btn.className = btn.className.replace(/step-\w+/, '');
+        if (i < currentStep) btn.classList.add('step-done');
+        else if (i === currentStep) btn.classList.add('step-active');
+        else btn.classList.add('step-inactive');
+      }
+    }
+
+    function switchGenre(genre) {
+      const data = sampleData[genre];
+      if (!data) return;
+      selectedTweetIdx = 0;
+      document.getElementById('research-genre-label').textContent = data.label;
+      const sc = document.getElementById('step1-sources');
+      sc.innerHTML = '';
+      data.sources.forEach(src => {
+        sc.innerHTML += `<div class="bg-white rounded-xl shadow-sm mb-4 overflow-hidden"><div class="px-5 py-3 bg-gray-50 border-b flex items-center gap-3"><div class="w-8 h-8 ${src.color} rounded-full flex items-center justify-center text-white text-xs font-bold">${src.avatar}</div><div><div class="font-bold text-sm">${src.name}</div><div class="text-xs text-gray-400">${src.handle}</div></div><span class="ml-auto text-xs text-gray-400">${src.count}件取得</span></div><div class="divide-y">${src.posts.map(p => `<div class="px-5 py-3 hover:bg-gray-50 transition"><p class="text-sm text-gray-800">${p.text}</p><div class="flex gap-4 mt-2 text-xs text-gray-400"><span>${p.time}</span><span>♻ ${p.rt}</span><span>♡ ${p.like}</span></div></div>`).join('')}</div></div>`;
+      });
+      document.getElementById('analysis-summary').innerHTML = data.analysis.summary;
+      document.getElementById('kp-positive').textContent = data.analysis.positive;
+      document.getElementById('kp-watch').textContent = data.analysis.watch;
+      document.getElementById('kp-risk').textContent = data.analysis.risk;
+      document.getElementById('references-list').innerHTML = data.references.map(r => `<span class="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2.5 py-1.5 rounded-full"><span class="font-medium text-gray-800">${r.source}</span> ${r.topic}</span>`).join('');
+      const pa = data.postAnalysis;
+      document.getElementById('pa-engagement-score').textContent = pa.engagementScore;
+      document.getElementById('pa-engagement-bar').style.width = pa.engagementBar;
+      document.getElementById('pa-engagement-reason').textContent = pa.engagementReason;
+      document.getElementById('pa-tone').textContent = pa.tone;
+      document.getElementById('pa-originality').textContent = pa.originality;
+      document.getElementById('pa-cta').textContent = pa.cta;
+      renderTweetCandidates(genre);
+      goToStep(1);
+    }
+
+    function runAnalysis() {
+      const btn = event.target.closest('button');
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> 分析中...';
+      btn.disabled = true; btn.classList.add('opacity-70');
+      setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; btn.classList.remove('opacity-70'); goToStep(1); }, 1500);
+    }
+
+    // 初期描画
+    renderTweetCandidates('stocks');
+  </script>
+</body>
+</html>
