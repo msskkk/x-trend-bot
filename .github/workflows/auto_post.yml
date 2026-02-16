@@ -1,11 +1,11 @@
 name: Auto Post X Trends
 
 on:
-  schedule:
-    # 1時間ごとに実行（UTC）
-    - cron: '0 * * * *'
+  # schedule:
+  #   # 1時間ごとに実行（UTC）
+  #   - cron: '0 * * * *'
   workflow_dispatch:
-    # 手動実行も可能
+    # 手動実行も可能（準備ができたらscheduleを有効化する）
 
 jobs:
   post-trends:
