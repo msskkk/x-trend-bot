@@ -1,0 +1,422 @@
+{% extends "base.html" %}
+{% block title %}新規投稿管理 - X Trend Bot{% endblock %}
+{% block breadcrumb %}新規投稿管理{% endblock %}
+{% block content %}
+
+{% set genre_color_map = {
+  'stocks':  {'bg': 'bg-blue-500/10',    'text': 'text-blue-400',    'border': 'border-blue-500/20'},
+  'crypto':  {'bg': 'bg-orange-500/10',  'text': 'text-orange-400',  'border': 'border-orange-500/20'},
+  'fx':      {'bg': 'bg-emerald-500/10', 'text': 'text-emerald-400', 'border': 'border-emerald-500/20'}
+} %}
+
+<div class="fade-up">
+
+  <!-- ページタイトル -->
+  <div class="mb-6 flex items-start justify-between">
+    <div>
+      <h1 class="text-xl font-semibold text-white">新規投稿管理</h1>
+      <p class="text-sm text-gray-500 mt-0.5">下書き・投稿プレビュー・予約投稿を管理</p>
+    </div>
+  </div>
+
+  <!-- タブ -->
+  <div class="flex items-center gap-1 mb-6 bg-white/5 p-1 rounded-xl w-fit border border-white/5">
+    <a href="/posts/drafts"
+       class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition
+         {% if tab == 'drafts' %}bg-white/10 text-white{% else %}text-gray-500 hover:text-gray-300{% endif %}">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+      </svg>
+      下書き
+      {% if draft_list %}
+      <span class="text-xs bg-white/10 px-1.5 py-0.5 rounded-full">{{ draft_list|length }}</span>
+      {% endif %}
+    </a>
+    <a href="/posts/preview"
+       class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition
+         {% if tab == 'preview' %}bg-white/10 text-white{% else %}text-gray-500 hover:text-gray-300{% endif %}">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+      </svg>
+      投稿イメージ
+    </a>
+    <a href="/posts/scheduled"
+       class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition
+         {% if tab == 'scheduled' %}bg-white/10 text-white{% else %}text-gray-500 hover:text-gray-300{% endif %}">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+      </svg>
+      予約済み
+      {% if scheduled_list %}
+      <span class="text-xs bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full">{{ scheduled_list|length }}</span>
+      {% endif %}
+    </a>
+  </div>
+
+  <!-- ===== 下書きタブ ===== -->
+  {% if tab == 'drafts' %}
+  <div class="grid grid-cols-5 gap-6">
+
+    <!-- 新規作成フォーム -->
+    <div class="col-span-2">
+      <div class="card rounded-2xl p-5">
+        <h2 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+          <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+          </svg>
+          新しい下書き
+        </h2>
+        <form action="/posts/save_draft" method="POST" class="space-y-4">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1.5">ジャンル</label>
+            <select name="genre" class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-indigo-500/50 transition">
+              <option value="">ジャンルを選択</option>
+              {% for g in genres %}
+              <option value="{{ g.id }}">{{ g.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1.5">本文</label>
+            <textarea name="text" id="draft-textarea" rows="6"
+                      placeholder="投稿内容を入力してください..."
+                      oninput="updateCounter(this)"
+                      class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500/50 transition resize-none leading-relaxed"></textarea>
+            <div class="flex justify-between items-center mt-1.5">
+              <span class="text-xs text-gray-600">Xの文字制限に基づきます</span>
+              <span id="char-counter" class="text-xs text-gray-600">0/140</span>
+            </div>
+            <div class="mt-1.5 h-1 bg-white/5 rounded-full overflow-hidden">
+              <div id="char-bar" class="h-full bg-indigo-500 rounded-full transition-all" style="width:0%"></div>
+            </div>
+          </div>
+          <button type="submit"
+                  class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium py-2.5 rounded-xl transition flex items-center justify-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+            </svg>
+            下書きを保存
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- 下書き一覧 -->
+    <div class="col-span-3 space-y-3">
+      {% if draft_list %}
+        {% for d in draft_list %}
+        {% set gc = genre_color_map.get(d.get('genre', ''), {'bg': 'bg-gray-500/10', 'text': 'text-gray-400', 'border': 'border-gray-500/20'}) %}
+        <div class="card rounded-2xl p-4 hover:border-white/10 transition">
+          <div class="flex items-start justify-between gap-3 mb-2">
+            <div class="flex items-center gap-2 flex-wrap">
+              {% if d.get('genre') %}
+              <span class="text-[11px] {{ gc.bg }} {{ gc.text }} border {{ gc.border }} px-2 py-0.5 rounded-full">
+                {{ d.genre }}
+              </span>
+              {% endif %}
+              <span class="text-xs text-gray-600">{{ d.created_at[:16].replace('T', ' ') }}</span>
+            </div>
+            <div class="flex items-center gap-1.5 flex-shrink-0">
+              <!-- 予約ボタン -->
+              <button onclick="openScheduleModal('{{ d.id }}')"
+                      class="text-xs text-gray-500 hover:text-amber-400 bg-white/5 hover:bg-amber-500/10 border border-white/5 hover:border-amber-500/20 px-2.5 py-1 rounded-lg transition flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                予約
+              </button>
+              <!-- 削除ボタン -->
+              <form action="/posts/delete/{{ d.id }}" method="POST" onsubmit="return confirm('削除しますか？')">
+                <button type="submit"
+                        class="text-xs text-gray-600 hover:text-red-400 bg-white/5 hover:bg-red-500/10 border border-white/5 hover:border-red-500/20 px-2.5 py-1 rounded-lg transition">
+                  削除
+                </button>
+              </form>
+            </div>
+          </div>
+          <p class="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{{ d.text }}</p>
+          <div class="mt-2 flex items-center gap-2">
+            <div class="flex-1 h-0.5 bg-white/5 rounded-full overflow-hidden">
+              {% set pct = [((d.text|length / 140) * 100)|int, 100]|min %}
+              <div class="h-full bg-indigo-500/60 rounded-full" style="width:{{ pct }}%"></div>
+            </div>
+            <span class="text-xs text-gray-600">{{ d.text|length }}/140</span>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="card rounded-2xl px-5 py-16 text-center">
+        <div class="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center mx-auto mb-3">
+          <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+          </svg>
+        </div>
+        <p class="text-sm text-gray-500">下書きはまだありません</p>
+        <p class="text-xs text-gray-600 mt-1">左のフォームから新しい下書きを作成してください</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ===== 投稿イメージタブ ===== -->
+  {% elif tab == 'preview' %}
+  <div class="grid grid-cols-5 gap-6">
+
+    <!-- 下書き選択 -->
+    <div class="col-span-2">
+      <div class="card rounded-2xl p-5">
+        <h2 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+          <svg class="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+          </svg>
+          下書きを選択
+        </h2>
+        {% if draft_list %}
+        <div class="space-y-2">
+          {% for d in draft_list %}
+          <button onclick="setPreview(`{{ d.text | replace('`', '\\`') }}`)"
+                  class="w-full text-left px-3 py-2.5 rounded-xl bg-white/5 hover:bg-white/8 border border-white/5 hover:border-white/10 transition text-xs text-gray-400 leading-relaxed line-clamp-3">
+            {{ d.text[:80] }}{% if d.text|length > 80 %}...{% endif %}
+          </button>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-xs text-gray-600 text-center py-6">下書きがありません</p>
+        {% endif %}
+
+        <!-- 直接入力 -->
+        <div class="mt-4 pt-4 border-t border-white/5">
+          <label class="block text-xs text-gray-500 mb-1.5">または直接入力</label>
+          <textarea id="preview-input" rows="5" placeholder="ここに投稿内容を入力..."
+                    oninput="setPreview(this.value)"
+                    class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-gray-300 placeholder-gray-600 focus:outline-none focus:border-violet-500/50 transition resize-none"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Xスタイルプレビュー -->
+    <div class="col-span-3">
+      <div class="card rounded-2xl p-5">
+        <h2 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+          <svg class="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+          </svg>
+          投稿イメージ
+        </h2>
+
+        <!-- Xカード風プレビュー -->
+        <div class="bg-black rounded-2xl p-4 border border-[#2f3336]">
+          <div class="flex gap-3">
+            <!-- アバター -->
+            <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-full flex items-center justify-center flex-shrink-0">
+              <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <!-- ユーザー情報 -->
+              <div class="flex items-center gap-1 flex-wrap">
+                <span class="text-[15px] font-bold text-white">X Trend Bot</span>
+                <svg class="w-4 h-4 text-[#1d9bf0]" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M22.25 12c0-1.43-.88-2.67-2.19-3.34.46-1.39.2-2.9-.81-3.91-1.01-1.01-2.52-1.27-3.91-.81-.67-1.31-1.9-2.19-3.34-2.19s-2.67.88-3.33 2.19c-1.4-.46-2.91-.2-3.92.81-1.01 1.01-1.27 2.52-.8 3.91C2.88 9.33 2 10.57 2 12s.88 2.67 2.19 3.34c-.46 1.39-.2 2.9.81 3.91 1.01 1.01 2.52 1.27 3.91.81.67 1.31 1.9 2.19 3.34 2.19s2.67-.88 3.34-2.19c1.39.46 2.9.2 3.91-.81 1.01-1.01 1.27-2.52.81-3.91 1.31-.67 2.19-1.9 2.19-3.34zm-11.71 4.2L6.8 12.46l1.41-1.42 2.26 2.26 4.8-5.23 1.47 1.36-6.2 6.77z"/>
+                </svg>
+                <span class="text-[15px] text-[#71767b]">@xtrend_bot</span>
+              </div>
+              <!-- 本文 -->
+              <div class="mt-2 text-[15px] text-white leading-relaxed whitespace-pre-wrap break-words" id="preview-text">
+                <span class="text-[#71767b] italic text-sm">← 左から下書きを選択するか、テキストを入力してください</span>
+              </div>
+              <!-- メタ -->
+              <div class="mt-3 text-[#71767b] text-[13px]">
+                <span id="preview-time">-- : -- · 2026/02/21</span>
+                <span class="mx-1">·</span>
+                <span class="text-[#1d9bf0] font-semibold">X Trend Bot</span>
+              </div>
+              <!-- アクションバー -->
+              <div class="mt-3 pt-3 border-t border-[#2f3336] flex items-center justify-between text-[#71767b]">
+                <button class="flex items-center gap-1.5 hover:text-[#1d9bf0] transition text-[13px]">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                  <span>0</span>
+                </button>
+                <button class="flex items-center gap-1.5 hover:text-[#00ba7c] transition text-[13px]">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                  <span>0</span>
+                </button>
+                <button class="flex items-center gap-1.5 hover:text-[#f91880] transition text-[13px]">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+                  <span>0</span>
+                </button>
+                <button class="flex items-center gap-1.5 hover:text-[#1d9bf0] transition text-[13px]">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 文字数メーター -->
+        <div class="mt-4 flex items-center gap-3">
+          <div class="flex-1">
+            <div class="h-1.5 bg-white/5 rounded-full overflow-hidden">
+              <div id="preview-bar" class="h-full bg-[#1d9bf0] rounded-full transition-all" style="width:0%"></div>
+            </div>
+          </div>
+          <span id="preview-count" class="text-xs text-gray-600 w-14 text-right">0 / 140</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 予約済みタブ ===== -->
+  {% elif tab == 'scheduled' %}
+  <div class="space-y-3">
+    {% if scheduled_list %}
+      {% for d in scheduled_list %}
+      {% set gc = genre_color_map.get(d.get('genre', ''), {'bg': 'bg-gray-500/10', 'text': 'text-gray-400', 'border': 'border-gray-500/20'}) %}
+      <div class="card rounded-2xl p-5 hover:border-white/10 transition">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-9 h-9 bg-amber-500/15 rounded-xl flex items-center justify-center flex-shrink-0">
+            <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              {% if d.get('genre') %}
+              <span class="text-[11px] {{ gc.bg }} {{ gc.text }} border {{ gc.border }} px-2 py-0.5 rounded-full">{{ d.genre }}</span>
+              {% endif %}
+              <span class="inline-flex items-center gap-1 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                {% if d.get('scheduled_at') %}{{ d.scheduled_at[:16].replace('T', ' ') }}{% else %}未設定{% endif %}
+              </span>
+            </div>
+            <div class="text-xs text-gray-600 mt-0.5">作成: {{ d.created_at[:16].replace('T', ' ') }}</div>
+          </div>
+          <form action="/posts/delete/{{ d.id }}" method="POST" onsubmit="return confirm('予約を削除しますか？')">
+            <button type="submit"
+                    class="text-xs text-gray-600 hover:text-red-400 bg-white/5 hover:bg-red-500/10 border border-white/5 hover:border-red-500/20 px-2.5 py-1 rounded-lg transition">
+              削除
+            </button>
+          </form>
+        </div>
+        <div class="pl-12">
+          <p class="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">{{ d.text }}</p>
+        </div>
+        <div class="pl-12 mt-3 flex items-center gap-2">
+          <div class="flex-1 h-0.5 bg-white/5 rounded-full overflow-hidden">
+            {% set pct = [((d.text|length / 140) * 100)|int, 100]|min %}
+            <div class="h-full bg-amber-500/50 rounded-full" style="width:{{ pct }}%"></div>
+          </div>
+          <span class="text-xs text-gray-600">{{ d.text|length }}/140</span>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+    <div class="card rounded-2xl px-5 py-20 text-center">
+      <div class="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4">
+        <svg class="w-7 h-7 text-gray-600" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+      </div>
+      <p class="text-sm text-gray-400 font-medium">予約済みの投稿はありません</p>
+      <p class="text-xs text-gray-600 mt-1.5">下書きから予約ボタンで投稿を予約できます</p>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- 予約モーダル -->
+<div id="schedule-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden" onclick="closeScheduleModal(event)">
+  <div class="card rounded-2xl p-6 w-80 mx-4">
+    <h3 class="text-sm font-semibold text-white mb-4">投稿を予約</h3>
+    <form id="schedule-form" action="" method="POST">
+      <div class="mb-4">
+        <label class="block text-xs text-gray-500 mb-1.5">予約日時</label>
+        <input type="datetime-local" name="scheduled_at"
+               class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-amber-500/50 transition"
+               style="color-scheme: dark;">
+      </div>
+      <div class="flex gap-2">
+        <button type="button" onclick="closeScheduleModal()"
+                class="flex-1 bg-white/5 hover:bg-white/8 text-gray-400 text-sm py-2 rounded-xl transition">
+          キャンセル
+        </button>
+        <button type="submit"
+                class="flex-1 bg-amber-500/80 hover:bg-amber-500 text-white text-sm font-medium py-2 rounded-xl transition">
+          予約する
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// 文字数カウンター（下書きフォーム）
+function updateCounter(textarea) {
+  const len = textarea.value.length;
+  const pct = Math.min((len / 140) * 100, 100);
+  const counter = document.getElementById('char-counter');
+  const bar = document.getElementById('char-bar');
+  if (counter) counter.textContent = len + '/140';
+  if (bar) {
+    bar.style.width = pct + '%';
+    bar.className = 'h-full rounded-full transition-all ' +
+      (pct >= 100 ? 'bg-red-500' : pct >= 75 ? 'bg-amber-400' : 'bg-indigo-500');
+  }
+}
+
+// 投稿イメージプレビュー
+function setPreview(text) {
+  const el = document.getElementById('preview-text');
+  const bar = document.getElementById('preview-bar');
+  const count = document.getElementById('preview-count');
+  const input = document.getElementById('preview-input');
+  if (el) {
+    if (text.trim()) {
+      el.textContent = text;
+      el.style.color = '#e7e9ea';
+    } else {
+      el.innerHTML = '<span class="text-[#71767b] italic text-sm">← 左から下書きを選択するか、テキストを入力してください</span>';
+    }
+  }
+  if (input && input.value !== text) input.value = text;
+  const len = text.length;
+  const pct = Math.min((len / 140) * 100, 100);
+  if (bar) {
+    bar.style.width = pct + '%';
+    bar.className = 'h-full rounded-full transition-all ' +
+      (pct >= 100 ? 'bg-red-500' : pct >= 75 ? 'bg-amber-400' : 'bg-[#1d9bf0]');
+  }
+  if (count) count.textContent = len + ' / 140';
+
+  // 現在時刻を更新
+  const now = new Date();
+  const timeEl = document.getElementById('preview-time');
+  if (timeEl) {
+    const h = String(now.getHours()).padStart(2, '0');
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const y = now.getFullYear();
+    const mo = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    timeEl.textContent = `${h}:${m} · ${y}/${mo}/${d}`;
+  }
+}
+
+// 予約モーダル
+function openScheduleModal(draftId) {
+  const form = document.getElementById('schedule-form');
+  if (form) form.action = '/posts/schedule/' + draftId;
+  document.getElementById('schedule-modal').classList.remove('hidden');
+}
+function closeScheduleModal(e) {
+  if (!e || e.target === document.getElementById('schedule-modal')) {
+    document.getElementById('schedule-modal').classList.add('hidden');
+  }
+}
+</script>
+{% endblock %}

@@ -7,6 +7,7 @@
 import sys
 import os
 import uuid
+from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -193,6 +194,82 @@ def history(genre_id=None):
                            current_genre=current_genre,
                            genre_counts=genre_counts,
                            total_count=len(all_posts))
+
+
+# --- 新規投稿管理 ---
+
+DRAFTS_FILE = 'drafts.json'
+
+
+def load_drafts():
+    try:
+        return load_json(DRAFTS_FILE)
+    except Exception:
+        return {'drafts': []}
+
+
+@app.route('/posts')
+@app.route('/posts/<tab>')
+def posts(tab='drafts'):
+    genres = load_json('genres.json')['genres']
+    data = load_drafts()
+    all_drafts = data.get('drafts', [])
+
+    draft_list = [d for d in all_drafts if d.get('status') == 'draft']
+    scheduled_list = [d for d in all_drafts if d.get('status') == 'scheduled']
+
+    return render_template('posts.html',
+                           tab=tab,
+                           draft_list=draft_list,
+                           scheduled_list=scheduled_list,
+                           all_drafts=all_drafts,
+                           genres=genres)
+
+
+@app.route('/posts/save_draft', methods=['POST'])
+def save_draft():
+    text = request.form.get('text', '').strip()
+    genre = request.form.get('genre', '')
+
+    if not text:
+        flash('テキストを入力してください', 'error')
+        return redirect(url_for('posts', tab='drafts'))
+
+    data = load_drafts()
+    data['drafts'].append({
+        'id': str(uuid.uuid4()),
+        'text': text,
+        'genre': genre,
+        'status': 'draft',
+        'created_at': datetime.now().isoformat(),
+        'scheduled_at': None,
+    })
+    save_json(DRAFTS_FILE, data)
+    flash('下書きを保存しました', 'success')
+    return redirect(url_for('posts', tab='drafts'))
+
+
+@app.route('/posts/schedule/<draft_id>', methods=['POST'])
+def schedule_draft(draft_id):
+    scheduled_at = request.form.get('scheduled_at', '')
+    data = load_drafts()
+    for d in data['drafts']:
+        if d['id'] == draft_id:
+            d['status'] = 'scheduled'
+            d['scheduled_at'] = scheduled_at
+            break
+    save_json(DRAFTS_FILE, data)
+    flash('予約を設定しました', 'success')
+    return redirect(url_for('posts', tab='scheduled'))
+
+
+@app.route('/posts/delete/<draft_id>', methods=['POST'])
+def delete_draft(draft_id):
+    data = load_drafts()
+    data['drafts'] = [d for d in data['drafts'] if d['id'] != draft_id]
+    save_json(DRAFTS_FILE, data)
+    flash('削除しました', 'success')
+    return redirect(url_for('posts', tab='drafts'))
 
 
 if __name__ == '__main__':
