@@ -321,6 +321,11 @@ function getGenreBadge(genre) {
     default: return 'bg-gray-500/10 text-gray-400 border-gray-500/20';
   }
 }
+function getGenreName(genreId) {
+  if (!genresData || !genresData.genres) return genreId || '';
+  const g = genresData.genres.find(g => g.id === genreId);
+  return g ? g.name : (genreId || '');
+}
 
 // ========== Page Logic ==========
 async function loadPage() {
@@ -400,7 +405,7 @@ function renderUsers() {
           <div class="font-medium text-sm text-white">${escapeHtml(user.display_name || user.username)}</div>
           <div class="text-xs text-gray-500 mt-0.5">@${escapeHtml(user.username)}</div>
         </div>
-        <span class="text-xs px-2.5 py-1 rounded-full border ${badgeCls}">${escapeHtml(user.genre || '')}</span>
+        <span class="text-xs px-2.5 py-1 rounded-full border ${badgeCls}">${escapeHtml(getGenreName(user.genre))}</span>
         ${enabled
           ? '<span class="flex items-center gap-1.5 text-xs text-emerald-400"><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>有効</span>'
           : '<span class="flex items-center gap-1.5 text-xs text-gray-500"><span class="w-1.5 h-1.5 bg-gray-500 rounded-full"></span>無効</span>'
