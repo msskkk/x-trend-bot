@@ -297,10 +297,9 @@ async function readFile(path) {
   });
   if (!resp.ok) throw new Error(`Failed to read ${path}: ${resp.status}`);
   const data = await resp.json();
-  const binaryString = atob(data.content);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
-  const content = JSON.parse(new TextDecoder().decode(bytes));
+  const base64 = data.content.replace(/\s/g, '');
+  const raw = await fetch('data:application/json;base64,' + base64);
+  const content = await raw.json();
   return { content, sha: data.sha };
 }
 
