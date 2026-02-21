@@ -16,6 +16,17 @@ from src.config import load_json, save_json
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
 
+# Jinja2グローバル関数: サイドバーでジャンル一覧を使用するため
+@app.context_processor
+def inject_globals():
+    try:
+        genres = load_json('genres.json')['genres']
+    except Exception:
+        genres = []
+    def load_genres():
+        return genres
+    return dict(load_genres=load_genres)
+
 
 # --- ダッシュボード ---
 
@@ -155,12 +166,33 @@ def delete_genre(genre_id):
 # --- 投稿履歴 ---
 
 @app.route('/history')
-def history():
+@app.route('/history/<genre_id>')
+def history(genre_id=None):
+    genres = load_json('genres.json')['genres']
     try:
-        posts = load_json('history.json')['posts']
+        all_posts = load_json('history.json')['posts']
     except Exception:
-        posts = []
-    return render_template('history.html', posts=posts)
+        all_posts = []
+
+    # ジャンル別フィルタリング
+    if genre_id:
+        posts = [p for p in all_posts if genre_id in p.get('genres', [])]
+        current_genre = next((g for g in genres if g['id'] == genre_id), None)
+    else:
+        posts = all_posts
+        current_genre = None
+
+    # ジャンルごとの件数を集計
+    genre_counts = {}
+    for g in genres:
+        genre_counts[g['id']] = sum(1 for p in all_posts if g['id'] in p.get('genres', []))
+
+    return render_template('history.html',
+                           posts=posts,
+                           genres=genres,
+                           current_genre=current_genre,
+                           genre_counts=genre_counts,
+                           total_count=len(all_posts))
 
 
 if __name__ == '__main__':
