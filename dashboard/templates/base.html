@@ -5,34 +5,156 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}X Trend Bot{% endblock %}</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .sidebar-link { transition: all 0.2s; }
+    .sidebar-link:hover { background: rgba(255,255,255,0.08); }
+    .sidebar-link.active { background: rgba(99,102,241,0.25); border-left: 3px solid #818cf8; color: #c7d2fe; }
+    .card { background: #1e2130; border: 1px solid rgba(255,255,255,0.07); }
+    .glass { background: rgba(255,255,255,0.04); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); }
+    .pulse-dot { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: #111827; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 999px; }
+    .fade-up { animation: fadeUp 0.35s ease both; }
+    @keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+  </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
-  <!-- ナビゲーション -->
-  <nav class="bg-gray-900 text-white">
-    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center gap-6">
-      <a href="/" class="font-bold text-lg">X Trend Bot</a>
-      <a href="/users" class="hover:text-blue-300 {% if request.path == '/users' %}text-blue-400{% endif %}">ユーザー</a>
-      <a href="/genres" class="hover:text-blue-300 {% if request.path == '/genres' %}text-blue-400{% endif %}">ジャンル</a>
-      <a href="/history" class="hover:text-blue-300 {% if request.path == '/history' %}text-blue-400{% endif %}">投稿履歴</a>
-    </div>
-  </nav>
+<body class="bg-[#0f1117] text-gray-100 min-h-screen flex">
 
-  <!-- フラッシュメッセージ -->
-  <div class="max-w-5xl mx-auto px-4 mt-4">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% for category, message in messages %}
-        <div class="mb-2 px-4 py-2 rounded text-sm
-          {% if category == 'error' %}bg-red-100 text-red-700 border border-red-300
-          {% else %}bg-green-100 text-green-700 border border-green-300{% endif %}">
-          {{ message }}
+  <!-- サイドバー -->
+  <aside class="w-60 min-h-screen bg-[#13151f] border-r border-white/5 flex flex-col fixed top-0 left-0 z-30">
+
+    <!-- ロゴ -->
+    <div class="px-6 py-5 border-b border-white/5">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+          <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+          </svg>
         </div>
-      {% endfor %}
-    {% endwith %}
+        <div>
+          <div class="font-semibold text-sm text-white">Trend Bot</div>
+          <div class="text-[10px] text-gray-500">AI管理ダッシュボード</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ステータス -->
+    <div class="px-4 py-3 mx-3 mt-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2.5">
+      <span class="w-2 h-2 bg-emerald-400 rounded-full pulse-dot"></span>
+      <span class="text-xs text-emerald-400 font-medium">Bot 稼働中</span>
+    </div>
+
+    <!-- ナビ -->
+    <nav class="flex-1 px-3 py-4 space-y-1">
+      <p class="text-[10px] uppercase tracking-widest text-gray-600 font-semibold px-3 mb-2">メニュー</p>
+      <a href="/" class="sidebar-link {% if request.path == '/' %}active{% endif %} flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-300">
+        <svg class="w-4 h-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+        </svg>
+        ダッシュボード
+      </a>
+      <a href="/users" class="sidebar-link {% if request.path == '/users' %}active{% endif %} flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-300">
+        <svg class="w-4 h-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        監視ユーザー
+      </a>
+      <a href="/genres" class="sidebar-link {% if request.path == '/genres' %}active{% endif %} flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-300">
+        <svg class="w-4 h-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+        </svg>
+        ジャンル
+      </a>
+      <!-- 投稿履歴（アコーディオン） -->
+      <div>
+        <a href="/history"
+           class="sidebar-link {% if request.path.startswith('/history') %}active{% endif %} flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-300">
+          <svg class="w-4 h-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+          </svg>
+          <span class="flex-1">投稿履歴</span>
+          <svg class="w-3.5 h-3.5 text-gray-600 transition-transform {% if request.path.startswith('/history') %}rotate-90{% endif %}"
+               fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+          </svg>
+        </a>
+
+        <!-- ジャンル子メニュー（履歴系ページにいるときだけ展開） -->
+        {% if request.path.startswith('/history') %}
+        <div class="ml-4 mt-1 space-y-0.5 border-l border-white/5 pl-3">
+          <a href="/history"
+             class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition
+               {% if request.path == '/history' %}text-indigo-300 bg-indigo-500/10{% else %}text-gray-500 hover:text-gray-300 hover:bg-white/5{% endif %}">
+            <span class="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0"></span>
+            すべて
+          </a>
+          {% set genre_colors = {'stocks': 'text-blue-400', 'crypto': 'text-orange-400', 'fx': 'text-emerald-400'} %}
+          {% for g in load_genres() %}
+          <a href="/history/{{ g.id }}"
+             class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition
+               {% if request.path == '/history/' + g.id %}text-indigo-300 bg-indigo-500/10{% else %}text-gray-500 hover:text-gray-300 hover:bg-white/5{% endif %}">
+            <span class="w-1.5 h-1.5 rounded-full flex-shrink-0
+              {{ genre_colors.get(g.id, 'bg-gray-400') }} bg-current"></span>
+            {{ g.name }}
+          </a>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </nav>
+
+    <!-- フッター -->
+    <div class="px-4 py-4 border-t border-white/5">
+      <div class="text-[10px] text-gray-600 text-center">Powered by Claude AI</div>
+    </div>
+  </aside>
+
+  <!-- メインコンテンツ -->
+  <div class="flex-1 ml-60">
+
+    <!-- トップバー -->
+    <header class="h-14 bg-[#13151f]/80 backdrop-blur border-b border-white/5 flex items-center px-6 sticky top-0 z-20">
+      <div class="flex items-center gap-2 text-sm text-gray-400">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+        </svg>
+        <span>{% block breadcrumb %}ダッシュボード{% endblock %}</span>
+      </div>
+      <div class="ml-auto flex items-center gap-3">
+        <div class="text-xs text-gray-500 bg-white/5 px-3 py-1.5 rounded-lg border border-white/5">
+          DRY_RUN モード
+        </div>
+      </div>
+    </header>
+
+    <!-- フラッシュメッセージ -->
+    <div class="px-6 pt-4">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+          <div class="mb-3 px-4 py-3 rounded-xl text-sm flex items-center gap-2 fade-up
+            {% if category == 'error' %}bg-red-500/10 text-red-300 border border-red-500/20
+            {% else %}bg-emerald-500/10 text-emerald-300 border border-emerald-500/20{% endif %}">
+            {% if category == 'error' %}
+              <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            {% else %}
+              <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            {% endif %}
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endwith %}
+    </div>
+
+    <!-- ページコンテンツ -->
+    <main class="px-6 py-6">
+      {% block content %}{% endblock %}
+    </main>
   </div>
 
-  <!-- コンテンツ -->
-  <main class="max-w-5xl mx-auto px-4 py-6">
-    {% block content %}{% endblock %}
-  </main>
 </body>
 </html>
