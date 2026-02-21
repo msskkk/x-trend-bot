@@ -297,7 +297,10 @@ async function readFile(path) {
   });
   if (!resp.ok) throw new Error(`Failed to read ${path}: ${resp.status}`);
   const data = await resp.json();
-  const content = JSON.parse(atob(data.content));
+  const binaryString = atob(data.content);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+  const content = JSON.parse(new TextDecoder().decode(bytes));
   return { content, sha: data.sha };
 }
 
@@ -306,7 +309,7 @@ async function writeFile(path, content, sha, message) {
   const url = `${GITHUB_API}/repos/${s.repo}/contents/${path}`;
   const body = {
     message: message || `Update ${path}`,
-    content: btoa(unescape(encodeURIComponent(JSON.stringify(content, null, 2)))),
+    content: btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(content, null, 2)))),
     sha: sha,
     branch: s.branch
   };
